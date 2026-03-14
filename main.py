@@ -2,6 +2,7 @@ from io import BytesIO
 from pathlib import Path
 import json
 from datetime import datetime
+import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -80,6 +81,13 @@ class VideoDownloaderApp:
         history_buttons_frame = tk.Frame(self.history_frame)
         history_buttons_frame.pack(fill="x", padx=10, pady=(10, 5))
 
+        open_folder_button = tk.Button(
+            history_buttons_frame,
+            text="Open Selected Folder",
+            command=self.open_selected_history_folder
+        )
+        open_folder_button.pack(side="left")
+
         clear_history_button = tk.Button(
             history_buttons_frame,
             text="Clear History",
@@ -93,6 +101,8 @@ class VideoDownloaderApp:
             font=("Arial", 10)
         )
         self.history_listbox.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.history_listbox.bind("<Double-Button-1>", self.on_history_double_click)
 
         self.refresh_history_listbox()
 
@@ -261,13 +271,49 @@ class VideoDownloaderApp:
         if not self.history_data:
             return
 
-        confirm = messagebox.askyesno("Clear History", "Are you sure you want to clear download history?")
+        confirm = messagebox.askyesno(
+            "Clear History",
+            "Are you sure you want to clear download history?"
+        )
         if not confirm:
             return
 
         self.history_data = []
         self.save_history()
         self.refresh_history_listbox()
+
+    def open_selected_history_folder(self):
+        selection = self.history_listbox.curselection()
+
+        if not selection:
+            messagebox.showwarning("No Selection", "Please select a history entry first.")
+            return
+
+        index = selection[0]
+
+        if not self.history_data or index >= len(self.history_data):
+            messagebox.showerror("Error", "Invalid history selection.")
+            return
+
+        folder = self.history_data[index].get("folder", "").strip()
+
+        if not folder:
+            messagebox.showerror("Error", "No folder path found for this history entry.")
+            return
+
+        folder_path = Path(folder)
+
+        if not folder_path.exists():
+            messagebox.showerror("Error", f"Folder does not exist:\n{folder}")
+            return
+
+        try:
+            subprocess.Popen(["xdg-open", str(folder_path)])
+        except Exception as e:
+            messagebox.showerror("Open Folder Error", str(e))
+
+    def on_history_double_click(self, event):
+        self.open_selected_history_folder()
 
     def update_quality_dropdown(self):
         menu = self.quality_dropdown["menu"]
