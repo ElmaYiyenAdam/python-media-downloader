@@ -12,13 +12,36 @@ import yt_dlp
 from yt_dlp.utils import sanitize_filename
 
 
+BG_COLOR = "#F5F7FB"
+CARD_COLOR = "#FFFFFF"
+ACCENT_COLOR = "#4F46E5"
+ACCENT_HOVER = "#4338CA"
+SUCCESS_COLOR = "#059669"
+WARNING_COLOR = "#D97706"
+ERROR_COLOR = "#DC2626"
+TEXT_COLOR = "#111827"
+SUBTEXT_COLOR = "#6B7280"
+MUTED_COLOR = "#9CA3AF"
+BORDER_COLOR = "#E5E7EB"
+SOFT_BG = "#EEF2FF"
+
+TITLE_FONT = ("Arial", 22, "bold")
+SECTION_FONT = ("Arial", 10, "bold")
+BODY_FONT = ("Arial", 10)
+SMALL_FONT = ("Arial", 9)
+BUTTON_FONT = ("Arial", 10, "bold")
+INFO_TITLE_FONT = ("Arial", 13, "bold")
+INFO_FONT = ("Arial", 10)
+
+
 class VideoDownloaderApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Video Downloader")
-        self.root.geometry("760x860")
-        self.root.minsize(760, 860)
+        self.root.geometry("860x930")
+        self.root.minsize(860, 930)
         self.root.resizable(True, True)
+        self.root.configure(bg=BG_COLOR)
 
         self.url_var = tk.StringVar()
         self.download_folder = tk.StringVar()
@@ -39,40 +62,103 @@ class VideoDownloaderApp:
         self.build_ui()
 
     def build_ui(self):
-        title_label = tk.Label(
-            self.root,
-            text="Video Downloader",
-            font=("Arial", 20, "bold")
+        style = ttk.Style()
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+
+        style.configure(
+            "Modern.Horizontal.TProgressbar",
+            troughcolor="#E5E7EB",
+            background=ACCENT_COLOR,
+            bordercolor="#E5E7EB",
+            lightcolor=ACCENT_COLOR,
+            darkcolor=ACCENT_COLOR
         )
-        title_label.pack(pady=20)
 
-        self.input_frame = tk.Frame(self.root)
-        self.input_frame.pack(fill="x", padx=25, pady=10)
+        self.main_container = tk.Frame(self.root, bg=BG_COLOR)
+        self.main_container.pack(fill="both", expand=True, padx=18, pady=18)
 
-        url_label = tk.Label(self.input_frame, text="Video URL:")
-        url_label.pack(anchor="w")
+        title_label = tk.Label(
+            self.main_container,
+            text="Video Downloader",
+            font=TITLE_FONT,
+            bg=BG_COLOR,
+            fg=TEXT_COLOR
+        )
+        title_label.pack(pady=(4, 14))
 
-        self.url_entry = tk.Entry(self.input_frame, textvariable=self.url_var, width=70)
-        self.url_entry.pack(fill="x", pady=8)
+        self.input_card = tk.Frame(
+            self.main_container,
+            bg=CARD_COLOR,
+            highlightthickness=1,
+            highlightbackground=BORDER_COLOR,
+            bd=0
+        )
+        self.input_card.pack(fill="x", padx=4, pady=(0, 12))
+
+        self.input_frame = tk.Frame(self.input_card, bg=CARD_COLOR)
+        self.input_frame.pack(fill="x", padx=18, pady=16)
+
+        url_label = tk.Label(
+            self.input_frame,
+            text="Video URL",
+            bg=CARD_COLOR,
+            fg=TEXT_COLOR,
+            font=SECTION_FONT
+        )
+        url_label.pack(anchor="w", pady=(0, 6))
+
+        self.url_entry = tk.Entry(
+            self.input_frame,
+            textvariable=self.url_var,
+            font=BODY_FONT,
+            relief="solid",
+            bd=1,
+            highlightthickness=1,
+            highlightbackground=BORDER_COLOR
+        )
+        self.url_entry.pack(fill="x", ipady=8)
+
+        actions_row = tk.Frame(self.input_frame, bg=CARD_COLOR)
+        actions_row.pack(fill="x", pady=(12, 0))
 
         self.fetch_button = tk.Button(
-            self.input_frame,
+            actions_row,
             text="Fetch Info",
-            font=("Arial", 11, "bold"),
-            width=18,
-            command=self.fetch_video_info
+            font=BUTTON_FONT,
+            width=16,
+            command=self.fetch_video_info,
+            bg=ACCENT_COLOR,
+            fg="white",
+            activebackground=ACCENT_HOVER,
+            activeforeground="white",
+            relief="flat",
+            bd=0,
+            padx=12,
+            pady=9,
+            cursor="hand2"
         )
-        self.fetch_button.pack(anchor="e", pady=8)
+        self.fetch_button.pack(side="right")
+
+        self.status_card = tk.Frame(self.main_container, bg=BG_COLOR)
+        self.status_card.pack(fill="x", padx=4, pady=(0, 10))
 
         self.status_label = tk.Label(
-            self.root,
-            text="Enter a URL and fetch video info.",
-            fg="blue",
-            font=("Arial", 10)
+            self.status_card,
+            text="Ready for a video URL",
+            fg=SUBTEXT_COLOR,
+            bg=SOFT_BG,
+            font=BODY_FONT,
+            padx=12,
+            pady=8,
+            anchor="w",
+            relief="flat"
         )
-        self.status_label.pack(pady=6)
+        self.status_label.pack(fill="x")
 
-        self.details_frame = tk.Frame(self.root)
+        self.details_frame = tk.Frame(self.main_container, bg=BG_COLOR)
 
         self.create_history_section()
 
@@ -80,32 +166,71 @@ class VideoDownloaderApp:
         self.root.bind("<Escape>", self.hide_history_context_menu, add="+")
 
     def create_history_section(self):
-        self.history_frame = tk.LabelFrame(self.root, text="Download History")
-        self.history_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        self.history_frame = tk.LabelFrame(
+            self.main_container,
+            text=" Download History ",
+            bg=CARD_COLOR,
+            fg=TEXT_COLOR,
+            font=SECTION_FONT,
+            bd=1,
+            relief="solid"
+        )
+        self.history_frame.pack(fill="both", expand=True, padx=4, pady=(0, 6))
 
-        history_buttons_frame = tk.Frame(self.history_frame)
-        history_buttons_frame.pack(fill="x", padx=10, pady=(10, 5))
+        history_buttons_frame = tk.Frame(self.history_frame, bg=CARD_COLOR)
+        history_buttons_frame.pack(fill="x", padx=14, pady=(12, 8))
 
         open_folder_button = tk.Button(
             history_buttons_frame,
             text="Open Selected Folder",
-            command=self.open_selected_history_folder
+            command=self.open_selected_history_folder,
+            bg=ACCENT_COLOR,
+            fg="white",
+            activebackground=ACCENT_HOVER,
+            activeforeground="white",
+            relief="flat",
+            bd=0,
+            padx=12,
+            pady=8,
+            cursor="hand2",
+            font=BUTTON_FONT,
+            width=18
         )
         open_folder_button.pack(side="left")
 
         clear_history_button = tk.Button(
             history_buttons_frame,
             text="Clear History",
-            command=self.clear_history
+            command=self.clear_history,
+            bg=ERROR_COLOR,
+            fg="white",
+            activebackground="#B91C1C",
+            activeforeground="white",
+            relief="flat",
+            bd=0,
+            padx=12,
+            pady=8,
+            cursor="hand2",
+            font=BUTTON_FONT,
+            width=14
         )
         clear_history_button.pack(side="right")
 
         self.history_listbox = tk.Listbox(
             self.history_frame,
-            height=10,
-            font=("Arial", 10)
+            height=13,
+            font=BODY_FONT,
+            bg="white",
+            fg=TEXT_COLOR,
+            relief="flat",
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=BORDER_COLOR,
+            selectbackground="#E0E7FF",
+            selectforeground=TEXT_COLOR,
+            activestyle="none"
         )
-        self.history_listbox.pack(fill="both", expand=True, padx=10, pady=10)
+        self.history_listbox.pack(fill="both", expand=True, padx=14, pady=(0, 14))
 
         self.history_listbox.bind("<Double-Button-1>", self.on_history_double_click)
         self.history_listbox.bind("<Button-3>", self.show_history_context_menu)
@@ -122,57 +247,98 @@ class VideoDownloaderApp:
         for widget in self.details_frame.winfo_children():
             widget.destroy()
 
-        info_container = tk.Frame(self.details_frame)
-        info_container.pack(fill="x", padx=10, pady=10)
+        info_container = tk.Frame(
+            self.details_frame,
+            bg=CARD_COLOR,
+            highlightthickness=1,
+            highlightbackground=BORDER_COLOR,
+            bd=0
+        )
+        info_container.pack(fill="x", padx=4, pady=(0, 12))
 
         self.thumbnail_label = tk.Label(
             info_container,
             text="No Thumbnail",
-            width=30,
-            height=10,
-            relief="solid",
-            bd=1
+            width=220,
+            height=124,
+            relief="flat",
+            bd=0,
+            bg="#F3F4F6",
+            fg=SUBTEXT_COLOR
         )
-        self.thumbnail_label.pack(side="left", padx=10, pady=10)
+        self.thumbnail_label.pack(side="left", padx=16, pady=16)
 
-        text_info_frame = tk.Frame(info_container)
-        text_info_frame.pack(side="left", fill="both", expand=True, padx=10)
+        text_info_frame = tk.Frame(info_container, bg=CARD_COLOR)
+        text_info_frame.pack(side="left", fill="both", expand=True, padx=(0, 16), pady=16)
+
+        meta_badge = tk.Label(
+            text_info_frame,
+            text="VIDEO DETAILS",
+            bg="#EEF2FF",
+            fg=ACCENT_COLOR,
+            font=SMALL_FONT,
+            padx=8,
+            pady=4
+        )
+        meta_badge.pack(anchor="w", pady=(0, 10))
 
         self.title_info_label = tk.Label(
             text_info_frame,
             text="Title: -",
             anchor="w",
             justify="left",
-            wraplength=380,
-            font=("Arial", 11, "bold")
+            wraplength=460,
+            font=INFO_TITLE_FONT,
+            bg=CARD_COLOR,
+            fg=TEXT_COLOR
         )
-        self.title_info_label.pack(fill="x", pady=6)
+        self.title_info_label.pack(fill="x", pady=(0, 10))
 
         self.channel_info_label = tk.Label(
             text_info_frame,
             text="Channel: -",
             anchor="w",
             justify="left",
-            wraplength=380
+            wraplength=460,
+            bg=CARD_COLOR,
+            fg=SUBTEXT_COLOR,
+            font=INFO_FONT
         )
-        self.channel_info_label.pack(fill="x", pady=6)
+        self.channel_info_label.pack(fill="x", pady=(0, 8))
 
         self.duration_info_label = tk.Label(
             text_info_frame,
             text="Duration: -",
             anchor="w",
-            justify="left"
+            justify="left",
+            bg=CARD_COLOR,
+            fg=SUBTEXT_COLOR,
+            font=INFO_FONT
         )
-        self.duration_info_label.pack(fill="x", pady=6)
+        self.duration_info_label.pack(fill="x")
 
-        options_frame = tk.LabelFrame(self.details_frame, text="Download Options")
-        options_frame.pack(fill="x", padx=10, pady=15)
+        options_frame = tk.LabelFrame(
+            self.details_frame,
+            text=" Download Options ",
+            bg=CARD_COLOR,
+            fg=TEXT_COLOR,
+            font=SECTION_FONT,
+            bd=1,
+            relief="solid"
+        )
+        options_frame.pack(fill="x", padx=4, pady=(0, 12))
 
-        quality_label = tk.Label(options_frame, text="Download Quality:")
-        quality_label.pack(anchor="w", padx=12, pady=(12, 4))
+        quality_label = tk.Label(
+            options_frame,
+            text="Download Quality",
+            bg=CARD_COLOR,
+            fg=TEXT_COLOR,
+            font=SECTION_FONT
+        )
+        quality_label.pack(anchor="w", padx=16, pady=(14, 6))
 
-        self.quality_menu_frame = tk.Frame(options_frame)
-        self.quality_menu_frame.pack(anchor="w", padx=12, pady=(0, 12))
+        self.quality_menu_frame = tk.Frame(options_frame, bg=CARD_COLOR)
+        self.quality_menu_frame.pack(anchor="w", padx=16, pady=(0, 14))
 
         self.quality_dropdown = tk.OptionMenu(
             self.quality_menu_frame,
@@ -180,60 +346,161 @@ class VideoDownloaderApp:
             *self.available_qualities
         )
         self.quality_dropdown.pack(anchor="w")
+        self.quality_dropdown.config(
+            bg="white",
+            fg=TEXT_COLOR,
+            relief="flat",
+            bd=0,
+            highlightthickness=1,
+            highlightbackground=BORDER_COLOR,
+            activebackground="#F3F4F6",
+            activeforeground=TEXT_COLOR,
+            font=BODY_FONT,
+            cursor="hand2",
+            padx=10,
+            pady=4
+        )
+        self.quality_dropdown["menu"].config(
+            bg="white",
+            fg=TEXT_COLOR,
+            activebackground="#E0E7FF",
+            activeforeground=TEXT_COLOR,
+            font=BODY_FONT
+        )
 
-        folder_label = tk.Label(options_frame, text="Download Folder:")
-        folder_label.pack(anchor="w", padx=12, pady=(0, 4))
+        folder_label = tk.Label(
+            options_frame,
+            text="Download Folder",
+            bg=CARD_COLOR,
+            fg=TEXT_COLOR,
+            font=SECTION_FONT
+        )
+        folder_label.pack(anchor="w", padx=16, pady=(0, 6))
 
-        folder_entry_frame = tk.Frame(options_frame)
-        folder_entry_frame.pack(fill="x", padx=12, pady=(0, 12))
+        folder_entry_frame = tk.Frame(options_frame, bg=CARD_COLOR)
+        folder_entry_frame.pack(fill="x", padx=16, pady=(0, 14))
 
         folder_entry = tk.Entry(
             folder_entry_frame,
-            textvariable=self.download_folder
+            textvariable=self.download_folder,
+            font=BODY_FONT,
+            relief="solid",
+            bd=1,
+            highlightthickness=1,
+            highlightbackground=BORDER_COLOR
         )
-        folder_entry.pack(side="left", fill="x", expand=True)
+        folder_entry.pack(side="left", fill="x", expand=True, ipady=7)
 
         browse_button = tk.Button(
             folder_entry_frame,
             text="Browse",
-            command=self.select_folder
+            command=self.select_folder,
+            bg=ACCENT_COLOR,
+            fg="white",
+            activebackground=ACCENT_HOVER,
+            activeforeground="white",
+            relief="flat",
+            bd=0,
+            padx=14,
+            pady=8,
+            cursor="hand2",
+            font=BUTTON_FONT,
+            width=12
         )
-        browse_button.pack(side="left", padx=6)
+        browse_button.pack(side="left", padx=(8, 0))
 
-        progress_frame = tk.LabelFrame(self.details_frame, text="Download Progress")
-        progress_frame.pack(fill="x", padx=10, pady=10)
+        progress_frame = tk.LabelFrame(
+            self.details_frame,
+            text=" Download Progress ",
+            bg=CARD_COLOR,
+            fg=TEXT_COLOR,
+            font=SECTION_FONT,
+            bd=1,
+            relief="solid"
+        )
+        progress_frame.pack(fill="x", padx=4, pady=(0, 12))
+
+        self.progress_percent_label = tk.Label(
+            progress_frame,
+            text="0%",
+            bg=CARD_COLOR,
+            fg=ACCENT_COLOR,
+            font=("Arial", 18, "bold")
+        )
+        self.progress_percent_label.pack(anchor="w", padx=16, pady=(14, 4))
 
         self.progress_bar = ttk.Progressbar(
             progress_frame,
             variable=self.progress_var,
-            maximum=100
+            maximum=100,
+            style="Modern.Horizontal.TProgressbar"
         )
-        self.progress_bar.pack(fill="x", padx=12, pady=(12, 6))
+        self.progress_bar.pack(fill="x", padx=16, pady=(0, 8))
 
         self.progress_info_label = tk.Label(
             progress_frame,
-            text="0%",
-            anchor="w"
+            text="Waiting to start",
+            anchor="w",
+            bg=CARD_COLOR,
+            fg=SUBTEXT_COLOR,
+            font=BODY_FONT
         )
-        self.progress_info_label.pack(fill="x", padx=12, pady=(0, 12))
+        self.progress_info_label.pack(fill="x", padx=16, pady=(0, 14))
+
+        button_row = tk.Frame(self.details_frame, bg=BG_COLOR)
+        button_row.pack(fill="x", padx=4, pady=(0, 6))
 
         self.new_video_button = tk.Button(
-            self.details_frame,
+            button_row,
             text="New Video",
-            font=("Arial", 10, "bold"),
+            font=BUTTON_FONT,
             width=16,
-            command=self.reset_to_input_view
+            command=self.reset_to_input_view,
+            bg="#6B7280",
+            fg="white",
+            activebackground="#4B5563",
+            activeforeground="white",
+            relief="flat",
+            bd=0,
+            padx=12,
+            pady=10,
+            cursor="hand2"
         )
-        self.new_video_button.pack(pady=(10, 8))
+        self.new_video_button.pack(side="left")
 
         self.download_button = tk.Button(
-            self.details_frame,
+            button_row,
             text="Download",
             font=("Arial", 11, "bold"),
-            width=20,
-            command=self.download_video
+            width=18,
+            command=self.download_video,
+            bg=ACCENT_COLOR,
+            fg="white",
+            activebackground=ACCENT_HOVER,
+            activeforeground="white",
+            relief="flat",
+            bd=0,
+            padx=12,
+            pady=10,
+            cursor="hand2"
         )
-        self.download_button.pack(pady=20)
+        self.download_button.pack(side="right")
+
+    def set_status(self, text, kind="default"):
+        if kind == "success":
+            bg = "#ECFDF5"
+            fg = SUCCESS_COLOR
+        elif kind == "warning":
+            bg = "#FFF7ED"
+            fg = WARNING_COLOR
+        elif kind == "error":
+            bg = "#FEF2F2"
+            fg = ERROR_COLOR
+        else:
+            bg = SOFT_BG
+            fg = SUBTEXT_COLOR
+
+        self.status_label.config(text=text, bg=bg, fg=fg)
 
     def load_history(self):
         if self.history_file.exists():
@@ -277,7 +544,10 @@ class VideoDownloaderApp:
             return
 
         for entry in self.history_data:
-            line = f"{entry['time']} | {entry['type']} | {entry['quality']} | {entry['title']}"
+            title = entry["title"]
+            if len(title) > 72:
+                title = title[:69] + "..."
+            line = f"{entry['time']}  •  {entry['type']}  •  {entry['quality']}  •  {title}"
             self.history_listbox.insert(tk.END, line)
 
     def clear_history(self):
@@ -522,7 +792,29 @@ class VideoDownloaderApp:
 
             image_data = BytesIO(response.content)
             image = Image.open(image_data)
-            image.thumbnail((220, 220))
+
+            target_width = 220
+            target_height = 124
+
+            img_width, img_height = image.size
+            img_ratio = img_width / img_height
+            target_ratio = target_width / target_height
+
+            if img_ratio > target_ratio:
+                new_height = target_height
+                new_width = int(new_height * img_ratio)
+            else:
+                new_width = target_width
+                new_height = int(new_width / img_ratio)
+
+            image = image.resize((new_width, new_height))
+
+            left = (new_width - target_width) // 2
+            top = (new_height - target_height) // 2
+            right = left + target_width
+            bottom = top + target_height
+
+            image = image.crop((left, top, right, bottom))
 
             self.thumbnail_photo = ImageTk.PhotoImage(image)
             self.thumbnail_label.config(image=self.thumbnail_photo, text="")
@@ -536,7 +828,7 @@ class VideoDownloaderApp:
             messagebox.showerror("Error", "Please enter a video URL first.")
             return
 
-        self.status_label.config(text="Fetching video info...", fg="orange")
+        self.set_status("Fetching video info...", "warning")
         self.root.update_idletasks()
 
         info_opts = {
@@ -552,12 +844,12 @@ class VideoDownloaderApp:
             self.video_info = info
             self.available_qualities, self.quality_map = self.extract_available_qualities(info)
 
-            self.input_frame.pack_forget()
+            self.input_card.pack_forget()
             self.history_frame.pack_forget()
 
             if not self.details_frame.winfo_ismapped():
                 self.create_details_section()
-                self.details_frame.pack(fill="both", expand=True, padx=20, pady=10)
+                self.details_frame.pack(fill="both", expand=True, padx=4, pady=(0, 6))
 
             self.update_quality_dropdown()
 
@@ -566,19 +858,20 @@ class VideoDownloaderApp:
             duration = self.format_duration(info.get("duration"))
             thumbnail_url = info.get("thumbnail")
 
-            self.title_info_label.config(text=f"Title: {title}")
+            self.title_info_label.config(text=title)
             self.channel_info_label.config(text=f"Channel: {channel}")
             self.duration_info_label.config(text=f"Duration: {duration}")
 
             self.progress_var.set(0)
-            self.progress_info_label.config(text="0%")
+            self.progress_percent_label.config(text="0%")
+            self.progress_info_label.config(text="Waiting to start")
 
             self.load_thumbnail(thumbnail_url)
 
-            self.status_label.config(text="Video info fetched successfully.", fg="green")
+            self.set_status("Video info fetched successfully.", "success")
 
         except Exception as e:
-            self.status_label.config(text="Failed to fetch video info.", fg="red")
+            self.set_status("Failed to fetch video info.", "error")
             messagebox.showerror("Info Error", str(e))
 
     def progress_hook(self, d):
@@ -589,6 +882,7 @@ class VideoDownloaderApp:
             if total_bytes:
                 percent = downloaded_bytes / total_bytes * 100
                 self.progress_var.set(percent)
+                self.progress_percent_label.config(text=f"{percent:.0f}%")
 
                 speed = d.get("speed")
                 eta = d.get("eta")
@@ -597,15 +891,15 @@ class VideoDownloaderApp:
                 eta_text = f"{eta} sec" if eta is not None else "Unknown ETA"
 
                 self.progress_info_label.config(
-                    text=f"{percent:.1f}% | Speed: {speed_text} | ETA: {eta_text}"
+                    text=f"Speed: {speed_text}   •   ETA: {eta_text}"
                 )
             else:
                 self.progress_info_label.config(text="Downloading...")
-
             self.root.update_idletasks()
 
         elif d["status"] == "finished":
             self.progress_var.set(100)
+            self.progress_percent_label.config(text="100%")
             self.progress_info_label.config(text="Download finished. Processing file...")
             self.root.update_idletasks()
 
@@ -620,7 +914,10 @@ class VideoDownloaderApp:
         self.quality_map = {}
 
         if hasattr(self, "progress_info_label"):
-            self.progress_info_label.config(text="0%")
+            self.progress_info_label.config(text="Waiting to start")
+
+        if hasattr(self, "progress_percent_label"):
+            self.progress_percent_label.config(text="0%")
 
         if hasattr(self, "title_info_label"):
             self.title_info_label.config(text="Title: -")
@@ -637,10 +934,10 @@ class VideoDownloaderApp:
         self.thumbnail_photo = None
 
         self.details_frame.pack_forget()
-        self.input_frame.pack(fill="x", padx=25, pady=10)
-        self.history_frame.pack(fill="both", expand=True, padx=20, pady=10)
+        self.input_card.pack(fill="x", padx=4, pady=(0, 12))
+        self.history_frame.pack(fill="both", expand=True, padx=4, pady=(0, 6))
 
-        self.status_label.config(text="Enter a URL and fetch video info.", fg="blue")
+        self.set_status("Ready for a video URL", "default")
         self.url_entry.focus_set()
 
     def build_final_file_path(self, folder, title, is_audio_only):
@@ -660,8 +957,9 @@ class VideoDownloaderApp:
             return
 
         self.progress_var.set(0)
+        self.progress_percent_label.config(text="0%")
         self.progress_info_label.config(text="Starting download...")
-        self.status_label.config(text="Downloading...", fg="orange")
+        self.set_status("Downloading...", "warning")
         self.download_button.config(state="disabled")
         self.fetch_button.config(state="disabled")
         self.root.update_idletasks()
@@ -693,8 +991,9 @@ class VideoDownloaderApp:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([self.video_url])
 
-            self.status_label.config(text="Download completed successfully!", fg="green")
-            self.progress_info_label.config(text="100% | Completed")
+            self.set_status("Download completed successfully.", "success")
+            self.progress_percent_label.config(text="100%")
+            self.progress_info_label.config(text="Completed")
 
             download_type = "MP3" if is_audio_only else "Video"
             final_file_path = self.build_final_file_path(folder, video_title, is_audio_only)
@@ -718,7 +1017,7 @@ class VideoDownloaderApp:
             if "ffmpeg is not installed" in error_message.lower():
                 error_message = "Merged video/audio downloads require ffmpeg. Please install ffmpeg first."
 
-            self.status_label.config(text="Download failed.", fg="red")
+            self.set_status("Download failed.", "error")
             self.progress_info_label.config(text="Download failed.")
             messagebox.showerror("Download Error", error_message)
 
