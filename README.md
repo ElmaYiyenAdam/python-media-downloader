@@ -54,3 +54,44 @@ Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
+
+---
+
+## Run
+
+```bash
+python main.py
+```
+
+---
+
+## Requirements
+
+Make sure ffmpeg is installed for high quality merging:
+
+```bash
+sudo apt install ffmpeg
+```
+
+---
+
+## Screenshot
+
+<p align="center">
+  <img src="screenshot.png" width="700">
+</p>
+
+---
+
+## Future Improvements
+
+* Playlist support
+* Download cancel button
+* Dark mode
+* Better export options
+
+---
+
+## License
+
+Personal project for educational and portfolio purposes.
