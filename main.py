@@ -270,11 +270,10 @@ class VideoDownloaderApp:
         selected_quality = self.quality_var.get()
 
         if selected_quality == "Best quality":
-            # Uyumluluk öncelikli "best"
             return "(bv*[vcodec~='^((he|a)vc|h26[45])'][ext=mp4]+ba[ext=m4a])/(b[ext=mp4])/(bv*+ba/b)"
 
         if selected_quality == "Audio only":
-            return "bestaudio[ext=m4a]/bestaudio/best"
+            return "bestaudio/best"
 
         if selected_quality in self.quality_map:
             format_id = self.quality_map[selected_quality]
@@ -449,14 +448,27 @@ class VideoDownloaderApp:
             "merge_output_format": "mp4",
         }
 
+        if self.quality_var.get() == "Audio only":
+            ydl_opts["format"] = "bestaudio/best"
+            ydl_opts["postprocessors"] = [
+                {
+                    "key": "FFmpegExtractAudio",
+                    "preferredcodec": "mp3",
+                    "preferredquality": "192",
+                }
+            ]
+
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 ydl.download([self.video_url])
 
             self.status_label.config(text="Download completed successfully!", fg="green")
             self.progress_info_label.config(text="100% | Completed")
-            messagebox.showinfo("Success", f"Downloaded successfully to:\n{folder}")
-
+            if self.quality_var.get() == "Audio only":
+                messagebox.showinfo("Success", f"MP3 downloaded successfully to:\n{folder}")
+            else:
+                messagebox.showinfo("Success", f"Video downloaded successfully to:\n{folder}")
+            
         except Exception as e:
             error_message = str(e)
 
