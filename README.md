@@ -1,3 +1,8 @@
+![Python](https://img.shields.io/badge/Python-3.x-blue)
+![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows%20%7C%20macOS-success)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+
 # YouTube Video Downloader
 
 A modern desktop YouTube downloader built with Python, Tkinter, and yt-dlp.
