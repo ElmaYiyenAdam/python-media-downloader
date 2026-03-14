@@ -1,6 +1,6 @@
 from pathlib import Path
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
 import yt_dlp
 
 
@@ -8,12 +8,14 @@ class VideoDownloaderApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Video Downloader")
-        self.root.geometry("520x450")
+        self.root.geometry("620x540")
+        self.root.minsize(620, 540)
         self.root.resizable(True, True)
 
         self.download_folder = tk.StringVar()
         self.url_var = tk.StringVar()
         self.quality_var = tk.StringVar(value="Best quality")
+        self.progress_var = tk.DoubleVar(value=0)
 
         self.create_widgets()
 
@@ -21,7 +23,7 @@ class VideoDownloaderApp:
         title_label = tk.Label(
             self.root,
             text="Video Downloader",
-            font=("Arial", 16, "bold")
+            font=("Arial", 18, "bold")
         )
         title_label.pack(pady=15)
 
@@ -77,6 +79,26 @@ class VideoDownloaderApp:
         )
         quality_menu.pack(anchor="w", pady=5)
 
+        progress_frame = tk.Frame(self.root)
+        progress_frame.pack(fill="x", padx=20, pady=10)
+
+        progress_title = tk.Label(progress_frame, text="Download Progress:")
+        progress_title.pack(anchor="w")
+
+        self.progress_bar = ttk.Progressbar(
+            progress_frame,
+            variable=self.progress_var,
+            maximum=100
+        )
+        self.progress_bar.pack(fill="x", pady=5)
+
+        self.progress_info_label = tk.Label(
+            progress_frame,
+            text="0%",
+            font=("Arial", 10)
+        )
+        self.progress_info_label.pack(anchor="w")
+
         self.status_label = tk.Label(
             self.root,
             text="Ready",
@@ -85,14 +107,14 @@ class VideoDownloaderApp:
         )
         self.status_label.pack(pady=15)
 
-        download_button = tk.Button(
+        self.download_button = tk.Button(
             self.root,
             text="Download",
             font=("Arial", 11, "bold"),
             width=20,
             command=self.download_video
         )
-        download_button.pack(pady=10)
+        self.download_button.pack(pady=25)
 
     def select_folder(self):
         folder = filedialog.askdirectory(title="Select Download Folder")
@@ -113,6 +135,34 @@ class VideoDownloaderApp:
         else:
             return "best"
 
+    def progress_hook(self, d):
+        if d["status"] == "downloading":
+            total_bytes = d.get("total_bytes") or d.get("total_bytes_estimate")
+            downloaded_bytes = d.get("downloaded_bytes", 0)
+
+            if total_bytes:
+                percent = downloaded_bytes / total_bytes * 100
+                self.progress_var.set(percent)
+
+                speed = d.get("speed")
+                eta = d.get("eta")
+
+                speed_text = f"{speed / 1024 / 1024:.2f} MiB/s" if speed else "Unknown speed"
+                eta_text = f"{eta} sec" if eta is not None else "Unknown ETA"
+
+                self.progress_info_label.config(
+                    text=f"{percent:.1f}% | Speed: {speed_text} | ETA: {eta_text}"
+                )
+            else:
+                self.progress_info_label.config(text="Downloading...")
+
+            self.root.update_idletasks()
+
+        elif d["status"] == "finished":
+            self.progress_var.set(100)
+            self.progress_info_label.config(text="Download finished. Processing file...")
+            self.root.update_idletasks()
+
     def download_video(self):
         url = self.url_var.get().strip()
         folder = self.download_folder.get().strip()
@@ -125,13 +175,17 @@ class VideoDownloaderApp:
             messagebox.showerror("Error", "Please select a download folder.")
             return
 
+        self.progress_var.set(0)
+        self.progress_info_label.config(text="Starting download...")
         self.status_label.config(text="Downloading...", fg="orange")
+        self.download_button.config(state="disabled")
         self.root.update_idletasks()
 
         ydl_opts = {
             "outtmpl": str(Path(folder) / "%(title)s.%(ext)s"),
             "format": self.get_format_option(),
             "noplaylist": True,
+            "progress_hooks": [self.progress_hook],
         }
 
         try:
@@ -139,11 +193,16 @@ class VideoDownloaderApp:
                 ydl.download([url])
 
             self.status_label.config(text="Download completed successfully!", fg="green")
+            self.progress_info_label.config(text="100% | Completed")
             messagebox.showinfo("Success", f"Downloaded successfully to:\n{folder}")
 
         except Exception as e:
             self.status_label.config(text="Download failed.", fg="red")
+            self.progress_info_label.config(text="Download failed.")
             messagebox.showerror("Download Error", str(e))
+
+        finally:
+            self.download_button.config(state="normal")
 
 
 if __name__ == "__main__":
