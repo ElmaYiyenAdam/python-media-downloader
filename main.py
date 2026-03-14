@@ -1,6 +1,10 @@
+from io import BytesIO
 from pathlib import Path
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+
+import requests
+from PIL import Image, ImageTk
 import yt_dlp
 
 
@@ -8,96 +12,109 @@ class VideoDownloaderApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Video Downloader")
-        self.root.geometry("620x720")
-        self.root.minsize(620, 720)
+        self.root.geometry("720x760")
+        self.root.minsize(720, 760)
         self.root.resizable(True, True)
 
-        self.download_folder = tk.StringVar()
         self.url_var = tk.StringVar()
+        self.download_folder = tk.StringVar()
         self.quality_var = tk.StringVar(value="Best quality")
         self.progress_var = tk.DoubleVar(value=0)
 
-        self.create_widgets()
+        self.video_url = None
+        self.thumbnail_photo = None
 
-    def create_widgets(self):
+        self.build_ui()
+
+    def build_ui(self):
         title_label = tk.Label(
             self.root,
             text="Video Downloader",
-            font=("Arial", 18, "bold")
+            font=("Arial", 20, "bold")
         )
-        title_label.pack(pady=15)
+        title_label.pack(pady=20)
 
-        url_frame = tk.Frame(self.root)
-        url_frame.pack(fill="x", padx=20, pady=10)
+        self.input_frame = tk.Frame(self.root)
+        self.input_frame.pack(fill="x", padx=25, pady=10)
 
-        url_label = tk.Label(url_frame, text="Video URL:")
+        url_label = tk.Label(self.input_frame, text="Video URL:")
         url_label.pack(anchor="w")
 
-        url_entry = tk.Entry(url_frame, textvariable=self.url_var, width=60)
-        url_entry.pack(fill="x", pady=5)
+        self.url_entry = tk.Entry(self.input_frame, textvariable=self.url_var, width=70)
+        self.url_entry.pack(fill="x", pady=8)
 
-        info_button = tk.Button(
-            url_frame,
+        self.fetch_button = tk.Button(
+            self.input_frame,
             text="Fetch Info",
+            font=("Arial", 11, "bold"),
+            width=18,
             command=self.fetch_video_info
         )
-        info_button.pack(anchor="e", pady=5)
+        self.fetch_button.pack(anchor="e", pady=8)
 
-        info_frame = tk.LabelFrame(self.root, text="Video Information")
-        info_frame.pack(fill="x", padx=20, pady=10)
+        self.status_label = tk.Label(
+            self.root,
+            text="Enter a URL and fetch video info.",
+            fg="blue",
+            font=("Arial", 10)
+        )
+        self.status_label.pack(pady=6)
+
+        self.details_frame = tk.Frame(self.root)
+        # başlangıçta pack edilmiyor, yani görünmeyecek
+
+    def create_details_section(self):
+        for widget in self.details_frame.winfo_children():
+            widget.destroy()
+
+        info_container = tk.Frame(self.details_frame)
+        info_container.pack(fill="x", padx=10, pady=10)
+
+        self.thumbnail_label = tk.Label(
+            info_container,
+            text="No Thumbnail",
+            width=30,
+            height=10,
+            relief="solid",
+            bd=1
+        )
+        self.thumbnail_label.pack(side="left", padx=10, pady=10)
+
+        text_info_frame = tk.Frame(info_container)
+        text_info_frame.pack(side="left", fill="both", expand=True, padx=10)
 
         self.title_info_label = tk.Label(
-            info_frame,
+            text_info_frame,
             text="Title: -",
             anchor="w",
-            justify="left"
+            justify="left",
+            wraplength=380,
+            font=("Arial", 11, "bold")
         )
-        self.title_info_label.pack(fill="x", padx=10, pady=4)
+        self.title_info_label.pack(fill="x", pady=6)
 
         self.channel_info_label = tk.Label(
-            info_frame,
+            text_info_frame,
             text="Channel: -",
             anchor="w",
-            justify="left"
+            justify="left",
+            wraplength=380
         )
-        self.channel_info_label.pack(fill="x", padx=10, pady=4)
+        self.channel_info_label.pack(fill="x", pady=6)
 
         self.duration_info_label = tk.Label(
-            info_frame,
+            text_info_frame,
             text="Duration: -",
             anchor="w",
             justify="left"
         )
-        self.duration_info_label.pack(fill="x", padx=10, pady=4)
+        self.duration_info_label.pack(fill="x", pady=6)
 
-        folder_frame = tk.Frame(self.root)
-        folder_frame.pack(fill="x", padx=20, pady=10)
+        options_frame = tk.LabelFrame(self.details_frame, text="Download Options")
+        options_frame.pack(fill="x", padx=10, pady=15)
 
-        folder_label = tk.Label(folder_frame, text="Download Folder:")
-        folder_label.pack(anchor="w")
-
-        folder_entry_frame = tk.Frame(folder_frame)
-        folder_entry_frame.pack(fill="x", pady=5)
-
-        folder_entry = tk.Entry(
-            folder_entry_frame,
-            textvariable=self.download_folder,
-            width=45
-        )
-        folder_entry.pack(side="left", fill="x", expand=True)
-
-        browse_button = tk.Button(
-            folder_entry_frame,
-            text="Browse",
-            command=self.select_folder
-        )
-        browse_button.pack(side="left", padx=5)
-
-        quality_frame = tk.Frame(self.root)
-        quality_frame.pack(fill="x", padx=20, pady=10)
-
-        quality_label = tk.Label(quality_frame, text="Download Quality:")
-        quality_label.pack(anchor="w")
+        quality_label = tk.Label(options_frame, text="Download Quality:")
+        quality_label.pack(anchor="w", padx=12, pady=(12, 4))
 
         quality_options = [
             "Best quality",
@@ -107,48 +124,56 @@ class VideoDownloaderApp:
         ]
 
         quality_menu = tk.OptionMenu(
-            quality_frame,
+            options_frame,
             self.quality_var,
             *quality_options
         )
-        quality_menu.pack(anchor="w", pady=5)
+        quality_menu.pack(anchor="w", padx=12, pady=(0, 12))
 
-        progress_frame = tk.Frame(self.root)
-        progress_frame.pack(fill="x", padx=20, pady=10)
+        folder_label = tk.Label(options_frame, text="Download Folder:")
+        folder_label.pack(anchor="w", padx=12, pady=(0, 4))
 
-        progress_title = tk.Label(progress_frame, text="Download Progress:")
-        progress_title.pack(anchor="w")
+        folder_entry_frame = tk.Frame(options_frame)
+        folder_entry_frame.pack(fill="x", padx=12, pady=(0, 12))
+
+        folder_entry = tk.Entry(
+            folder_entry_frame,
+            textvariable=self.download_folder
+        )
+        folder_entry.pack(side="left", fill="x", expand=True)
+
+        browse_button = tk.Button(
+            folder_entry_frame,
+            text="Browse",
+            command=self.select_folder
+        )
+        browse_button.pack(side="left", padx=6)
+
+        progress_frame = tk.LabelFrame(self.details_frame, text="Download Progress")
+        progress_frame.pack(fill="x", padx=10, pady=10)
 
         self.progress_bar = ttk.Progressbar(
             progress_frame,
             variable=self.progress_var,
             maximum=100
         )
-        self.progress_bar.pack(fill="x", pady=5)
+        self.progress_bar.pack(fill="x", padx=12, pady=(12, 6))
 
         self.progress_info_label = tk.Label(
             progress_frame,
             text="0%",
-            font=("Arial", 10)
+            anchor="w"
         )
-        self.progress_info_label.pack(anchor="w")
-
-        self.status_label = tk.Label(
-            self.root,
-            text="Ready",
-            fg="blue",
-            font=("Arial", 10)
-        )
-        self.status_label.pack(pady=15)
+        self.progress_info_label.pack(fill="x", padx=12, pady=(0, 12))
 
         self.download_button = tk.Button(
-            self.root,
+            self.details_frame,
             text="Download",
             font=("Arial", 11, "bold"),
             width=20,
             command=self.download_video
         )
-        self.download_button.pack(pady=25)
+        self.download_button.pack(pady=20)
 
     def select_folder(self):
         folder = filedialog.askdirectory(title="Select Download Folder")
@@ -160,14 +185,13 @@ class VideoDownloaderApp:
 
         if quality == "Best quality":
             return "best"
-        elif quality == "Audio only":
+        if quality == "Audio only":
             return "bestaudio"
-        elif quality == "720p":
+        if quality == "720p":
             return "bestvideo[height<=720]+bestaudio/best"
-        elif quality == "1080p":
+        if quality == "1080p":
             return "bestvideo[height<=1080]+bestaudio/best"
-        else:
-            return "best"
+        return "best"
 
     def format_duration(self, seconds):
         if not seconds:
@@ -179,6 +203,24 @@ class VideoDownloaderApp:
         if hours > 0:
             return f"{hours}:{minutes:02}:{sec:02}"
         return f"{minutes}:{sec:02}"
+
+    def load_thumbnail(self, thumbnail_url):
+        if not thumbnail_url:
+            self.thumbnail_label.config(image="", text="No Thumbnail")
+            return
+
+        try:
+            response = requests.get(thumbnail_url, timeout=10)
+            response.raise_for_status()
+
+            image_data = BytesIO(response.content)
+            image = Image.open(image_data)
+            image.thumbnail((220, 220))
+
+            self.thumbnail_photo = ImageTk.PhotoImage(image)
+            self.thumbnail_label.config(image=self.thumbnail_photo, text="")
+        except Exception:
+            self.thumbnail_label.config(image="", text="Thumbnail\nUnavailable")
 
     def fetch_video_info(self):
         url = self.url_var.get().strip()
@@ -199,13 +241,26 @@ class VideoDownloaderApp:
             with yt_dlp.YoutubeDL(info_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
 
+            self.video_url = url
+            self.input_frame.pack_forget()
+
+            if not self.details_frame.winfo_ismapped():
+                self.create_details_section()
+                self.details_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
             title = info.get("title", "Unknown title")
-            channel = info.get("uploader", "Unknown channel")
+            channel = info.get("uploader") or info.get("channel") or "Unknown channel"
             duration = self.format_duration(info.get("duration"))
+            thumbnail_url = info.get("thumbnail")
 
             self.title_info_label.config(text=f"Title: {title}")
             self.channel_info_label.config(text=f"Channel: {channel}")
             self.duration_info_label.config(text=f"Duration: {duration}")
+
+            self.progress_var.set(0)
+            self.progress_info_label.config(text="0%")
+
+            self.load_thumbnail(thumbnail_url)
 
             self.status_label.config(text="Video info fetched successfully.", fg="green")
 
@@ -242,11 +297,10 @@ class VideoDownloaderApp:
             self.root.update_idletasks()
 
     def download_video(self):
-        url = self.url_var.get().strip()
         folder = self.download_folder.get().strip()
 
-        if not url:
-            messagebox.showerror("Error", "Please enter a video URL.")
+        if not self.video_url:
+            messagebox.showerror("Error", "Please fetch video info first.")
             return
 
         if not folder:
@@ -257,6 +311,7 @@ class VideoDownloaderApp:
         self.progress_info_label.config(text="Starting download...")
         self.status_label.config(text="Downloading...", fg="orange")
         self.download_button.config(state="disabled")
+        self.fetch_button.config(state="disabled")
         self.root.update_idletasks()
 
         ydl_opts = {
@@ -268,7 +323,7 @@ class VideoDownloaderApp:
 
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
+                ydl.download([self.video_url])
 
             self.status_label.config(text="Download completed successfully!", fg="green")
             self.progress_info_label.config(text="100% | Completed")
@@ -281,6 +336,7 @@ class VideoDownloaderApp:
 
         finally:
             self.download_button.config(state="normal")
+            self.fetch_button.config(state="normal")
 
 
 if __name__ == "__main__":
