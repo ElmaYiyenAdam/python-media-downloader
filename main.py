@@ -6,6 +6,7 @@ import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+import certifi
 import requests
 from PIL import Image, ImageTk
 import yt_dlp
@@ -119,7 +120,7 @@ class VideoDownloaderApp:
             highlightthickness=1,
             highlightbackground=BORDER_COLOR
         )
-        self.url_entry.pack(fill="x", ipady=8)
+        self.url_entry.pack(fill="x", pady=8, ipady=6)
 
         actions_row = tk.Frame(self.input_frame, bg=CARD_COLOR)
         actions_row.pack(fill="x", pady=(12, 0))
@@ -256,17 +257,27 @@ class VideoDownloaderApp:
         )
         info_container.pack(fill="x", padx=4, pady=(0, 12))
 
-        self.thumbnail_label = tk.Label(
+        self.thumbnail_frame = tk.Frame(
             info_container,
-            text="No Thumbnail",
             width=220,
             height=124,
-            relief="flat",
-            bd=0,
             bg="#F3F4F6",
-            fg=SUBTEXT_COLOR
+            highlightthickness=1,
+            highlightbackground=BORDER_COLOR,
+            bd=0
         )
-        self.thumbnail_label.pack(side="left", padx=16, pady=16)
+        self.thumbnail_frame.pack(side="left", padx=16, pady=16)
+        self.thumbnail_frame.pack_propagate(False)
+
+        self.thumbnail_label = tk.Label(
+            self.thumbnail_frame,
+            text="No Thumbnail",
+            bg="#F3F4F6",
+            fg=SUBTEXT_COLOR,
+            font=BODY_FONT,
+            justify="center"
+        )
+        self.thumbnail_label.pack(fill="both", expand=True)
 
         text_info_frame = tk.Frame(info_container, bg=CARD_COLOR)
         text_info_frame.pack(side="left", fill="both", expand=True, padx=(0, 16), pady=16)
@@ -783,15 +794,19 @@ class VideoDownloaderApp:
 
     def load_thumbnail(self, thumbnail_url):
         if not thumbnail_url:
-            self.thumbnail_label.config(image="", text="No Thumbnail")
+            self.thumbnail_label.config(image="", text="Thumbnail\nUnavailable")
             return
 
         try:
-            response = requests.get(thumbnail_url, timeout=10)
-            response.raise_for_status()
+            import ssl
+            import urllib.request
 
-            image_data = BytesIO(response.content)
-            image = Image.open(image_data)
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+
+            with urllib.request.urlopen(thumbnail_url, context=ssl_context, timeout=10) as response:
+                image_data = BytesIO(response.read())
+
+            image = Image.open(image_data).convert("RGB")
 
             target_width = 220
             target_height = 124
@@ -807,7 +822,7 @@ class VideoDownloaderApp:
                 new_width = target_width
                 new_height = int(new_width / img_ratio)
 
-            image = image.resize((new_width, new_height))
+            image = image.resize((new_width, new_height), Image.LANCZOS)
 
             left = (new_width - target_width) // 2
             top = (new_height - target_height) // 2
@@ -818,7 +833,9 @@ class VideoDownloaderApp:
 
             self.thumbnail_photo = ImageTk.PhotoImage(image)
             self.thumbnail_label.config(image=self.thumbnail_photo, text="")
-        except Exception:
+
+        except Exception as e:
+            print("Thumbnail loading failed:", e)
             self.thumbnail_label.config(image="", text="Thumbnail\nUnavailable")
 
     def fetch_video_info(self):
