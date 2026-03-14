@@ -6,3 +6,6 @@ history.json
 build/
 dist/
 *.spec
+VideoDownloader.desktop
+*.zip
+.DS_Store
