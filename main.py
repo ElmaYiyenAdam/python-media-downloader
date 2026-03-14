@@ -61,7 +61,6 @@ class VideoDownloaderApp:
         self.status_label.pack(pady=6)
 
         self.details_frame = tk.Frame(self.root)
-        # başlangıçta pack edilmiyor, yani görünmeyecek
 
     def create_details_section(self):
         for widget in self.details_frame.winfo_children():
@@ -166,6 +165,15 @@ class VideoDownloaderApp:
         )
         self.progress_info_label.pack(fill="x", padx=12, pady=(0, 12))
 
+        self.new_video_button = tk.Button(
+            self.details_frame,
+            text="New Video",
+            font=("Arial", 10, "bold"),
+            width=16,
+            command=self.reset_to_input_view
+        )
+        self.new_video_button.pack(pady=(10, 8))
+
         self.download_button = tk.Button(
             self.details_frame,
             text="Download",
@@ -180,18 +188,20 @@ class VideoDownloaderApp:
         if folder:
             self.download_folder.set(folder)
 
+
     def get_format_option(self):
         quality = self.quality_var.get()
 
         if quality == "Best quality":
-            return "best"
+            return "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[vcodec^=avc1][ext=mp4]/best[ext=mp4]/best"
         if quality == "Audio only":
-            return "bestaudio"
+            return "bestaudio[ext=m4a]/bestaudio/best"
         if quality == "720p":
-            return "bestvideo[height<=720]+bestaudio/best"
+            return "bestvideo[height<=720][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][vcodec^=avc1][ext=mp4]/best[height<=720][ext=mp4]/best"
         if quality == "1080p":
-            return "bestvideo[height<=1080]+bestaudio/best"
-        return "best"
+            return "bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][vcodec^=avc1][ext=mp4]/best[height<=1080][ext=mp4]/best"
+
+        return "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[vcodec^=avc1][ext=mp4]/best[ext=mp4]/best"
 
     def format_duration(self, seconds):
         if not seconds:
@@ -296,6 +306,36 @@ class VideoDownloaderApp:
             self.progress_info_label.config(text="Download finished. Processing file...")
             self.root.update_idletasks()
 
+    def reset_to_input_view(self):
+        self.video_url = None
+        self.url_var.set("")
+        self.download_folder.set("")
+        self.quality_var.set("Best quality")
+        self.progress_var.set(0)
+
+        if hasattr(self, "progress_info_label"):
+            self.progress_info_label.config(text="0%")
+
+        if hasattr(self, "title_info_label"):
+            self.title_info_label.config(text="Title: -")
+
+        if hasattr(self, "channel_info_label"):
+            self.channel_info_label.config(text="Channel: -")
+
+        if hasattr(self, "duration_info_label"):
+            self.duration_info_label.config(text="Duration: -")
+
+        if hasattr(self, "thumbnail_label"):
+            self.thumbnail_label.config(image="", text="No Thumbnail")
+
+        self.thumbnail_photo = None
+
+        self.details_frame.pack_forget()
+        self.input_frame.pack(fill="x", padx=25, pady=10)
+
+        self.status_label.config(text="Enter a URL and fetch video info.", fg="blue")
+        self.url_entry.focus_set()
+
     def download_video(self):
         folder = self.download_folder.get().strip()
 
@@ -319,6 +359,11 @@ class VideoDownloaderApp:
             "format": self.get_format_option(),
             "noplaylist": True,
             "progress_hooks": [self.progress_hook],
+            "merge_output_format": "mp4",
+            "postprocessors": [{
+                "key": "FFmpegVideoConvertor",
+                "preferedformat": "mp4",
+            }],
         }
 
         try:
@@ -330,9 +375,14 @@ class VideoDownloaderApp:
             messagebox.showinfo("Success", f"Downloaded successfully to:\n{folder}")
 
         except Exception as e:
+            error_message = str(e)
+
+            if "ffmpeg is not installed" in error_message.lower():
+                error_message = "Merged video downloads require ffmpeg. Please install ffmpeg first."
+
             self.status_label.config(text="Download failed.", fg="red")
             self.progress_info_label.config(text="Download failed.")
-            messagebox.showerror("Download Error", str(e))
+            messagebox.showerror("Download Error", error_message)
 
         finally:
             self.download_button.config(state="normal")
