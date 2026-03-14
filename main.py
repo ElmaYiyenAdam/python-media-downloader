@@ -237,10 +237,10 @@ class VideoDownloaderApp:
         self.history_listbox.bind("<Button-3>", self.show_history_context_menu)
 
         self.history_menu = tk.Menu(self.root, tearoff=0)
-        self.history_menu.add_command(label="Dosyayı Aç", command=self.menu_open_file)
-        self.history_menu.add_command(label="Klasörü Aç", command=self.menu_open_folder)
+        self.history_menu.add_command(label="Open File", command=self.menu_open_file)
+        self.history_menu.add_command(label="Open Folder", command=self.menu_open_folder)
         self.history_menu.add_separator()
-        self.history_menu.add_command(label="History'den Kaldır", command=self.menu_remove_history_entry)
+        self.history_menu.add_command(label="Remove from History", command=self.menu_remove_history_entry)
 
         self.refresh_history_listbox()
 
