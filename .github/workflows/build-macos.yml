@@ -1,0 +1,53 @@
+name: Build macOS App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Tcl/Tk
+        run: brew install python-tk@3.11 || true
+
+      - name: Create virtual environment
+        run: python3 -m venv venv
+
+      - name: Install dependencies
+        run: |
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller certifi
+
+      - name: Build app with PyInstaller
+        run: |
+          source venv/bin/activate
+          pyinstaller \
+            --windowed \
+            --onedir \
+            --name "VideoDownloader" \
+            --icon icon.png \
+            --collect-data certifi \
+            --hidden-import PIL._tkinter_finder \
+            main.py
+
+      - name: Zip build output
+        run: |
+          cd dist
+          zip -r VideoDownloader-macos.zip VideoDownloader
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoDownloader-macos
+          path: dist/VideoDownloader-macos.zip
