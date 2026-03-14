@@ -8,8 +8,8 @@ class VideoDownloaderApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Video Downloader")
-        self.root.geometry("620x540")
-        self.root.minsize(620, 540)
+        self.root.geometry("620x720")
+        self.root.minsize(620, 720)
         self.root.resizable(True, True)
 
         self.download_folder = tk.StringVar()
@@ -35,6 +35,40 @@ class VideoDownloaderApp:
 
         url_entry = tk.Entry(url_frame, textvariable=self.url_var, width=60)
         url_entry.pack(fill="x", pady=5)
+
+        info_button = tk.Button(
+            url_frame,
+            text="Fetch Info",
+            command=self.fetch_video_info
+        )
+        info_button.pack(anchor="e", pady=5)
+
+        info_frame = tk.LabelFrame(self.root, text="Video Information")
+        info_frame.pack(fill="x", padx=20, pady=10)
+
+        self.title_info_label = tk.Label(
+            info_frame,
+            text="Title: -",
+            anchor="w",
+            justify="left"
+        )
+        self.title_info_label.pack(fill="x", padx=10, pady=4)
+
+        self.channel_info_label = tk.Label(
+            info_frame,
+            text="Channel: -",
+            anchor="w",
+            justify="left"
+        )
+        self.channel_info_label.pack(fill="x", padx=10, pady=4)
+
+        self.duration_info_label = tk.Label(
+            info_frame,
+            text="Duration: -",
+            anchor="w",
+            justify="left"
+        )
+        self.duration_info_label.pack(fill="x", padx=10, pady=4)
 
         folder_frame = tk.Frame(self.root)
         folder_frame.pack(fill="x", padx=20, pady=10)
@@ -134,6 +168,50 @@ class VideoDownloaderApp:
             return "bestvideo[height<=1080]+bestaudio/best"
         else:
             return "best"
+
+    def format_duration(self, seconds):
+        if not seconds:
+            return "-"
+
+        minutes, sec = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+
+        if hours > 0:
+            return f"{hours}:{minutes:02}:{sec:02}"
+        return f"{minutes}:{sec:02}"
+
+    def fetch_video_info(self):
+        url = self.url_var.get().strip()
+
+        if not url:
+            messagebox.showerror("Error", "Please enter a video URL first.")
+            return
+
+        self.status_label.config(text="Fetching video info...", fg="orange")
+        self.root.update_idletasks()
+
+        info_opts = {
+            "quiet": True,
+            "noplaylist": True,
+        }
+
+        try:
+            with yt_dlp.YoutubeDL(info_opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+
+            title = info.get("title", "Unknown title")
+            channel = info.get("uploader", "Unknown channel")
+            duration = self.format_duration(info.get("duration"))
+
+            self.title_info_label.config(text=f"Title: {title}")
+            self.channel_info_label.config(text=f"Channel: {channel}")
+            self.duration_info_label.config(text=f"Duration: {duration}")
+
+            self.status_label.config(text="Video info fetched successfully.", fg="green")
+
+        except Exception as e:
+            self.status_label.config(text="Failed to fetch video info.", fg="red")
+            messagebox.showerror("Info Error", str(e))
 
     def progress_hook(self, d):
         if d["status"] == "downloading":
