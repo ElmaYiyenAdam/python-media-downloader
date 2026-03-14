@@ -22,7 +22,10 @@ class VideoDownloaderApp:
         self.progress_var = tk.DoubleVar(value=0)
 
         self.video_url = None
+        self.video_info = None
         self.thumbnail_photo = None
+        self.available_qualities = ["Best quality", "Audio only"]
+        self.quality_map = {}
 
         self.build_ui()
 
@@ -115,19 +118,15 @@ class VideoDownloaderApp:
         quality_label = tk.Label(options_frame, text="Download Quality:")
         quality_label.pack(anchor="w", padx=12, pady=(12, 4))
 
-        quality_options = [
-            "Best quality",
-            "Audio only",
-            "720p",
-            "1080p"
-        ]
+        self.quality_menu_frame = tk.Frame(options_frame)
+        self.quality_menu_frame.pack(anchor="w", padx=12, pady=(0, 12))
 
-        quality_menu = tk.OptionMenu(
-            options_frame,
+        self.quality_dropdown = tk.OptionMenu(
+            self.quality_menu_frame,
             self.quality_var,
-            *quality_options
+            *self.available_qualities
         )
-        quality_menu.pack(anchor="w", padx=12, pady=(0, 12))
+        self.quality_dropdown.pack(anchor="w")
 
         folder_label = tk.Label(options_frame, text="Download Folder:")
         folder_label.pack(anchor="w", padx=12, pady=(0, 4))
@@ -183,25 +182,105 @@ class VideoDownloaderApp:
         )
         self.download_button.pack(pady=20)
 
+    def update_quality_dropdown(self):
+        menu = self.quality_dropdown["menu"]
+        menu.delete(0, "end")
+
+        for quality in self.available_qualities:
+            menu.add_command(
+                label=quality,
+                command=lambda value=quality: self.quality_var.set(value)
+            )
+
+        self.quality_var.set(self.available_qualities[0])
+
+    def extract_available_qualities(self, info):
+        formats = info.get("formats", [])
+        grouped_formats = {}
+
+        for fmt in formats:
+            height = fmt.get("height")
+            vcodec = fmt.get("vcodec")
+            format_id = fmt.get("format_id")
+            ext = fmt.get("ext")
+
+            if not height or not format_id:
+                continue
+
+            if not vcodec or vcodec == "none":
+                continue
+
+            label = f"{height}p"
+
+            if label not in grouped_formats:
+                grouped_formats[label] = []
+
+            grouped_formats[label].append({
+                "format_id": format_id,
+                "ext": ext,
+                "vcodec": vcodec
+            })
+
+        def codec_priority(fmt):
+            vcodec = (fmt.get("vcodec") or "").lower()
+            ext = (fmt.get("ext") or "").lower()
+
+            score = 0
+
+            # mp4 container öncelikli
+            if ext == "mp4":
+                score += 100
+
+            # en uyumlu codec öncelikli
+            if "avc1" in vcodec:
+                score += 1000
+            elif "h264" in vcodec:
+                score += 900
+            elif "hev1" in vcodec or "h265" in vcodec or "hevc" in vcodec:
+                score += 500
+            elif "vp9" in vcodec:
+                score += 300
+            elif "av01" in vcodec or "av1" in vcodec:
+                score += 200
+            else:
+                score += 100
+
+            return score
+
+        quality_map = {}
+
+        for label, candidates in grouped_formats.items():
+            best_candidate = max(candidates, key=codec_priority)
+            quality_map[label] = best_candidate["format_id"]
+
+        sorted_labels = sorted(
+            quality_map.keys(),
+            key=lambda x: int(x[:-1])
+        )
+
+        qualities = ["Best quality", "Audio only"] + sorted_labels
+        return qualities, quality_map
+
     def select_folder(self):
         folder = filedialog.askdirectory(title="Select Download Folder")
         if folder:
             self.download_folder.set(folder)
 
-
     def get_format_option(self):
-        quality = self.quality_var.get()
+        selected_quality = self.quality_var.get()
 
-        if quality == "Best quality":
-            return "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[vcodec^=avc1][ext=mp4]/best[ext=mp4]/best"
-        if quality == "Audio only":
+        if selected_quality == "Best quality":
+            # Uyumluluk öncelikli "best"
+            return "(bv*[vcodec~='^((he|a)vc|h26[45])'][ext=mp4]+ba[ext=m4a])/(b[ext=mp4])/(bv*+ba/b)"
+
+        if selected_quality == "Audio only":
             return "bestaudio[ext=m4a]/bestaudio/best"
-        if quality == "720p":
-            return "bestvideo[height<=720][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][vcodec^=avc1][ext=mp4]/best[height<=720][ext=mp4]/best"
-        if quality == "1080p":
-            return "bestvideo[height<=1080][vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[height<=1080][vcodec^=avc1][ext=mp4]/best[height<=1080][ext=mp4]/best"
 
-        return "bestvideo[vcodec^=avc1][ext=mp4]+bestaudio[ext=m4a]/best[vcodec^=avc1][ext=mp4]/best[ext=mp4]/best"
+        if selected_quality in self.quality_map:
+            format_id = self.quality_map[selected_quality]
+            return f"{format_id}+ba[ext=m4a]/{format_id}+bestaudio/{format_id}"
+
+        return "(bv*[vcodec~='^((he|a)vc|h26[45])'][ext=mp4]+ba[ext=m4a])/(b[ext=mp4])/(bv*+ba/b)"
 
     def format_duration(self, seconds):
         if not seconds:
@@ -252,11 +331,16 @@ class VideoDownloaderApp:
                 info = ydl.extract_info(url, download=False)
 
             self.video_url = url
+            self.video_info = info
+            self.available_qualities, self.quality_map = self.extract_available_qualities(info)
+
             self.input_frame.pack_forget()
 
             if not self.details_frame.winfo_ismapped():
                 self.create_details_section()
                 self.details_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+            self.update_quality_dropdown()
 
             title = info.get("title", "Unknown title")
             channel = info.get("uploader") or info.get("channel") or "Unknown channel"
@@ -308,10 +392,13 @@ class VideoDownloaderApp:
 
     def reset_to_input_view(self):
         self.video_url = None
+        self.video_info = None
         self.url_var.set("")
         self.download_folder.set("")
         self.quality_var.set("Best quality")
         self.progress_var.set(0)
+        self.available_qualities = ["Best quality", "Audio only"]
+        self.quality_map = {}
 
         if hasattr(self, "progress_info_label"):
             self.progress_info_label.config(text="0%")
@@ -360,10 +447,6 @@ class VideoDownloaderApp:
             "noplaylist": True,
             "progress_hooks": [self.progress_hook],
             "merge_output_format": "mp4",
-            "postprocessors": [{
-                "key": "FFmpegVideoConvertor",
-                "preferedformat": "mp4",
-            }],
         }
 
         try:
