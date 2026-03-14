@@ -9,6 +9,7 @@ from tkinter import filedialog, messagebox, ttk
 import requests
 from PIL import Image, ImageTk
 import yt_dlp
+from yt_dlp.utils import sanitize_filename
 
 
 class VideoDownloaderApp:
@@ -32,6 +33,7 @@ class VideoDownloaderApp:
 
         self.history_file = Path("history.json")
         self.history_data = []
+        self.history_menu_visible = False
 
         self.load_history()
         self.build_ui()
@@ -74,6 +76,9 @@ class VideoDownloaderApp:
 
         self.create_history_section()
 
+        self.root.bind("<Button-1>", self.hide_history_context_menu, add="+")
+        self.root.bind("<Escape>", self.hide_history_context_menu, add="+")
+
     def create_history_section(self):
         self.history_frame = tk.LabelFrame(self.root, text="Download History")
         self.history_frame.pack(fill="both", expand=True, padx=20, pady=10)
@@ -103,6 +108,13 @@ class VideoDownloaderApp:
         self.history_listbox.pack(fill="both", expand=True, padx=10, pady=10)
 
         self.history_listbox.bind("<Double-Button-1>", self.on_history_double_click)
+        self.history_listbox.bind("<Button-3>", self.show_history_context_menu)
+
+        self.history_menu = tk.Menu(self.root, tearoff=0)
+        self.history_menu.add_command(label="Dosyayı Aç", command=self.menu_open_file)
+        self.history_menu.add_command(label="Klasörü Aç", command=self.menu_open_folder)
+        self.history_menu.add_separator()
+        self.history_menu.add_command(label="History'den Kaldır", command=self.menu_remove_history_entry)
 
         self.refresh_history_listbox()
 
@@ -240,12 +252,13 @@ class VideoDownloaderApp:
         except OSError:
             messagebox.showerror("History Error", "Failed to save download history.")
 
-    def add_to_history(self, title, download_type, quality, folder):
+    def add_to_history(self, title, download_type, quality, folder, file_path):
         entry = {
             "title": title,
             "type": download_type,
             "quality": quality,
             "folder": folder,
+            "file_path": file_path,
             "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 
@@ -282,17 +295,46 @@ class VideoDownloaderApp:
         self.save_history()
         self.refresh_history_listbox()
 
-    def open_selected_history_folder(self):
+    def get_selected_history_index(self):
         selection = self.history_listbox.curselection()
 
         if not selection:
             messagebox.showwarning("No Selection", "Please select a history entry first.")
-            return
+            return None
 
         index = selection[0]
 
         if not self.history_data or index >= len(self.history_data):
             messagebox.showerror("Error", "Invalid history selection.")
+            return None
+
+        return index
+
+    def open_selected_history_file(self):
+        index = self.get_selected_history_index()
+        if index is None:
+            return
+
+        file_path_str = self.history_data[index].get("file_path", "").strip()
+
+        if not file_path_str:
+            messagebox.showerror("Error", "No file path found for this history entry.")
+            return
+
+        file_path = Path(file_path_str)
+
+        if not file_path.exists():
+            messagebox.showerror("Error", f"File does not exist:\n{file_path}")
+            return
+
+        try:
+            subprocess.Popen(["xdg-open", str(file_path)])
+        except Exception as e:
+            messagebox.showerror("Open File Error", str(e))
+
+    def open_selected_history_folder(self):
+        index = self.get_selected_history_index()
+        if index is None:
             return
 
         folder = self.history_data[index].get("folder", "").strip()
@@ -312,8 +354,65 @@ class VideoDownloaderApp:
         except Exception as e:
             messagebox.showerror("Open Folder Error", str(e))
 
+    def remove_selected_history_entry(self):
+        index = self.get_selected_history_index()
+        if index is None:
+            return
+
+        confirm = messagebox.askyesno(
+            "Remove History Entry",
+            "Remove the selected entry from history?"
+        )
+        if not confirm:
+            return
+
+        self.history_data.pop(index)
+        self.save_history()
+        self.refresh_history_listbox()
+
     def on_history_double_click(self, event):
         self.open_selected_history_folder()
+
+    def hide_history_context_menu(self, event=None):
+        if self.history_menu_visible:
+            try:
+                self.history_menu.unpost()
+            except Exception:
+                pass
+            self.history_menu_visible = False
+
+    def menu_open_file(self):
+        self.hide_history_context_menu()
+        self.open_selected_history_file()
+
+    def menu_open_folder(self):
+        self.hide_history_context_menu()
+        self.open_selected_history_folder()
+
+    def menu_remove_history_entry(self):
+        self.hide_history_context_menu()
+        self.remove_selected_history_entry()
+
+    def show_history_context_menu(self, event):
+        if not self.history_data:
+            return
+
+        index = self.history_listbox.nearest(event.y)
+
+        if index < 0 or index >= len(self.history_data):
+            return
+
+        self.hide_history_context_menu()
+
+        self.history_listbox.selection_clear(0, tk.END)
+        self.history_listbox.selection_set(index)
+        self.history_listbox.activate(index)
+
+        try:
+            self.history_menu_visible = True
+            self.history_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.history_menu.grab_release()
 
     def update_quality_dropdown(self):
         menu = self.quality_dropdown["menu"]
@@ -544,6 +643,11 @@ class VideoDownloaderApp:
         self.status_label.config(text="Enter a URL and fetch video info.", fg="blue")
         self.url_entry.focus_set()
 
+    def build_final_file_path(self, folder, title, is_audio_only):
+        safe_title = sanitize_filename(title, restricted=False)
+        extension = "mp3" if is_audio_only else "mp4"
+        return str(Path(folder) / f"{safe_title}.{extension}")
+
     def download_video(self):
         folder = self.download_folder.get().strip()
 
@@ -593,7 +697,15 @@ class VideoDownloaderApp:
             self.progress_info_label.config(text="100% | Completed")
 
             download_type = "MP3" if is_audio_only else "Video"
-            self.add_to_history(video_title, download_type, selected_quality, folder)
+            final_file_path = self.build_final_file_path(folder, video_title, is_audio_only)
+
+            self.add_to_history(
+                video_title,
+                download_type,
+                selected_quality,
+                folder,
+                final_file_path
+            )
 
             if is_audio_only:
                 messagebox.showinfo("Success", f"MP3 downloaded successfully to:\n{folder}")
