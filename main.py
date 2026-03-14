@@ -1,5 +1,7 @@
 from io import BytesIO
 from pathlib import Path
+import json
+from datetime import datetime
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
@@ -12,8 +14,8 @@ class VideoDownloaderApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Video Downloader")
-        self.root.geometry("720x760")
-        self.root.minsize(720, 760)
+        self.root.geometry("760x860")
+        self.root.minsize(760, 860)
         self.root.resizable(True, True)
 
         self.url_var = tk.StringVar()
@@ -27,6 +29,10 @@ class VideoDownloaderApp:
         self.available_qualities = ["Best quality", "Audio only"]
         self.quality_map = {}
 
+        self.history_file = Path("history.json")
+        self.history_data = []
+
+        self.load_history()
         self.build_ui()
 
     def build_ui(self):
@@ -64,6 +70,31 @@ class VideoDownloaderApp:
         self.status_label.pack(pady=6)
 
         self.details_frame = tk.Frame(self.root)
+
+        self.create_history_section()
+
+    def create_history_section(self):
+        self.history_frame = tk.LabelFrame(self.root, text="Download History")
+        self.history_frame.pack(fill="both", expand=True, padx=20, pady=10)
+
+        history_buttons_frame = tk.Frame(self.history_frame)
+        history_buttons_frame.pack(fill="x", padx=10, pady=(10, 5))
+
+        clear_history_button = tk.Button(
+            history_buttons_frame,
+            text="Clear History",
+            command=self.clear_history
+        )
+        clear_history_button.pack(side="right")
+
+        self.history_listbox = tk.Listbox(
+            self.history_frame,
+            height=10,
+            font=("Arial", 10)
+        )
+        self.history_listbox.pack(fill="both", expand=True, padx=10, pady=10)
+
+        self.refresh_history_listbox()
 
     def create_details_section(self):
         for widget in self.details_frame.winfo_children():
@@ -182,6 +213,62 @@ class VideoDownloaderApp:
         )
         self.download_button.pack(pady=20)
 
+    def load_history(self):
+        if self.history_file.exists():
+            try:
+                with open(self.history_file, "r", encoding="utf-8") as file:
+                    self.history_data = json.load(file)
+            except (json.JSONDecodeError, OSError):
+                self.history_data = []
+        else:
+            self.history_data = []
+
+    def save_history(self):
+        try:
+            with open(self.history_file, "w", encoding="utf-8") as file:
+                json.dump(self.history_data, file, indent=4, ensure_ascii=False)
+        except OSError:
+            messagebox.showerror("History Error", "Failed to save download history.")
+
+    def add_to_history(self, title, download_type, quality, folder):
+        entry = {
+            "title": title,
+            "type": download_type,
+            "quality": quality,
+            "folder": folder,
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        self.history_data.insert(0, entry)
+        self.save_history()
+        self.refresh_history_listbox()
+
+    def refresh_history_listbox(self):
+        if not hasattr(self, "history_listbox"):
+            return
+
+        self.history_listbox.delete(0, tk.END)
+
+        if not self.history_data:
+            self.history_listbox.insert(tk.END, "No downloads yet.")
+            return
+
+        for entry in self.history_data:
+            line = f"{entry['time']} | {entry['type']} | {entry['quality']} | {entry['title']}"
+            self.history_listbox.insert(tk.END, line)
+
+    def clear_history(self):
+        if not self.history_data:
+            return
+
+        confirm = messagebox.askyesno("Clear History", "Are you sure you want to clear download history?")
+        if not confirm:
+            return
+
+        self.history_data = []
+        self.save_history()
+        self.refresh_history_listbox()
+
     def update_quality_dropdown(self):
         menu = self.quality_dropdown["menu"]
         menu.delete(0, "end")
@@ -196,69 +283,56 @@ class VideoDownloaderApp:
 
     def extract_available_qualities(self, info):
         formats = info.get("formats", [])
-        grouped_formats = {}
+        quality_map = {}
 
-        for fmt in formats:
-            height = fmt.get("height")
-            vcodec = fmt.get("vcodec")
-            format_id = fmt.get("format_id")
-            ext = fmt.get("ext")
-
-            if not height or not format_id:
-                continue
-
-            if not vcodec or vcodec == "none":
-                continue
-
-            label = f"{height}p"
-
-            if label not in grouped_formats:
-                grouped_formats[label] = []
-
-            grouped_formats[label].append({
-                "format_id": format_id,
-                "ext": ext,
-                "vcodec": vcodec
-            })
-
-        def codec_priority(fmt):
+        def is_compatible_video(fmt):
             vcodec = (fmt.get("vcodec") or "").lower()
             ext = (fmt.get("ext") or "").lower()
 
-            score = 0
+            if not fmt.get("height") or not fmt.get("format_id"):
+                return False
 
-            # mp4 container öncelikli
-            if ext == "mp4":
-                score += 100
+            if not vcodec or vcodec == "none":
+                return False
 
-            # en uyumlu codec öncelikli
+            if ext != "mp4":
+                return False
+
+            return (
+                "avc1" in vcodec or
+                "h264" in vcodec or
+                "hev1" in vcodec or
+                "h265" in vcodec or
+                "hevc" in vcodec
+            )
+
+        def codec_score(fmt):
+            vcodec = (fmt.get("vcodec") or "").lower()
+
             if "avc1" in vcodec:
-                score += 1000
-            elif "h264" in vcodec:
-                score += 900
-            elif "hev1" in vcodec or "h265" in vcodec or "hevc" in vcodec:
-                score += 500
-            elif "vp9" in vcodec:
-                score += 300
-            elif "av01" in vcodec or "av1" in vcodec:
-                score += 200
-            else:
-                score += 100
+                return 1000
+            if "h264" in vcodec:
+                return 900
+            if "hev1" in vcodec or "h265" in vcodec or "hevc" in vcodec:
+                return 700
+            return 0
 
-            return score
+        grouped = {}
 
-        quality_map = {}
+        for fmt in formats:
+            if not is_compatible_video(fmt):
+                continue
 
-        for label, candidates in grouped_formats.items():
-            best_candidate = max(candidates, key=codec_priority)
+            label = f"{fmt['height']}p"
+            grouped.setdefault(label, []).append(fmt)
+
+        for label, candidates in grouped.items():
+            best_candidate = max(candidates, key=codec_score)
             quality_map[label] = best_candidate["format_id"]
 
-        sorted_labels = sorted(
-            quality_map.keys(),
-            key=lambda x: int(x[:-1])
-        )
-
+        sorted_labels = sorted(quality_map.keys(), key=lambda x: int(x[:-1]))
         qualities = ["Best quality", "Audio only"] + sorted_labels
+
         return qualities, quality_map
 
     def select_folder(self):
@@ -334,6 +408,7 @@ class VideoDownloaderApp:
             self.available_qualities, self.quality_map = self.extract_available_qualities(info)
 
             self.input_frame.pack_forget()
+            self.history_frame.pack_forget()
 
             if not self.details_frame.winfo_ismapped():
                 self.create_details_section()
@@ -418,6 +493,7 @@ class VideoDownloaderApp:
 
         self.details_frame.pack_forget()
         self.input_frame.pack(fill="x", padx=25, pady=10)
+        self.history_frame.pack(fill="both", expand=True, padx=20, pady=10)
 
         self.status_label.config(text="Enter a URL and fetch video info.", fg="blue")
         self.url_entry.focus_set()
@@ -440,6 +516,9 @@ class VideoDownloaderApp:
         self.fetch_button.config(state="disabled")
         self.root.update_idletasks()
 
+        selected_quality = self.quality_var.get()
+        video_title = self.video_info.get("title", "Unknown title") if self.video_info else "Unknown title"
+
         ydl_opts = {
             "outtmpl": str(Path(folder) / "%(title)s.%(ext)s"),
             "format": self.get_format_option(),
@@ -448,7 +527,9 @@ class VideoDownloaderApp:
             "merge_output_format": "mp4",
         }
 
-        if self.quality_var.get() == "Audio only":
+        is_audio_only = selected_quality == "Audio only"
+
+        if is_audio_only:
             ydl_opts["format"] = "bestaudio/best"
             ydl_opts["postprocessors"] = [
                 {
@@ -464,16 +545,20 @@ class VideoDownloaderApp:
 
             self.status_label.config(text="Download completed successfully!", fg="green")
             self.progress_info_label.config(text="100% | Completed")
-            if self.quality_var.get() == "Audio only":
+
+            download_type = "MP3" if is_audio_only else "Video"
+            self.add_to_history(video_title, download_type, selected_quality, folder)
+
+            if is_audio_only:
                 messagebox.showinfo("Success", f"MP3 downloaded successfully to:\n{folder}")
             else:
                 messagebox.showinfo("Success", f"Video downloaded successfully to:\n{folder}")
-            
+
         except Exception as e:
             error_message = str(e)
 
             if "ffmpeg is not installed" in error_message.lower():
-                error_message = "Merged video downloads require ffmpeg. Please install ffmpeg first."
+                error_message = "Merged video/audio downloads require ffmpeg. Please install ffmpeg first."
 
             self.status_label.config(text="Download failed.", fg="red")
             self.progress_info_label.config(text="Download failed.")
