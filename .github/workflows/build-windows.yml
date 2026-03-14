@@ -1,0 +1,43 @@
+name: Build Windows App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        shell: powershell
+        run: |
+          python -m venv venv
+          .\venv\Scripts\Activate.ps1
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller certifi
+
+      - name: Build app with PyInstaller
+        shell: powershell
+        run: |
+          .\venv\Scripts\Activate.ps1
+          pyinstaller --windowed --onedir --name "VideoDownloader" --icon icon.png --collect-data certifi --hidden-import PIL._tkinter_finder main.py
+
+      - name: Zip build output
+        shell: powershell
+        run: |
+          Compress-Archive -Path .\dist\VideoDownloader\* -DestinationPath .\dist\VideoDownloader-windows.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: VideoDownloader-windows
+          path: dist/VideoDownloader-windows.zip
