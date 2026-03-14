@@ -1,24 +1,41 @@
-# yt-dlp Wrapper CLI
+# YouTube Video Downloader
 
-A simple Python-based media downloader built with `yt-dlp` and `tkinter`.
+A modern desktop YouTube downloader built with Python, Tkinter, and yt-dlp.
+
+This application allows downloading videos or audio from YouTube with dynamic quality detection, thumbnail preview, progress tracking, and download history support.
+
+---
 
 ## Features
 
-- Select download folder with a folder picker
-- Download best quality video
-- Download audio only
-- Choose custom maximum resolution
-- Simple command-line interaction
-- Basic error handling
+- Fetch video info before download
+- Dynamic quality detection based on available formats
+- Download as MP4 video or MP3 audio
+- Automatic thumbnail preview
+- Real-time download progress
+- Download history tracking
+- Right-click history menu:
+  - Open file
+  - Open folder
+  - Remove from history
+- Modern polished desktop interface
 
-## Requirements
+---
 
-- Python 3.x
+## Technologies Used
+
+- Python
+- Tkinter
 - yt-dlp
+- Pillow
+- requests
+
+---
 
 ## Installation
 
+Clone repository:
+
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+git clone https://github.com/ElmaYiyenAdam/python-media-downloader.git
+cd python-media-downloader
